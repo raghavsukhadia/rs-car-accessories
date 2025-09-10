@@ -235,7 +235,10 @@ export async function seed() {
       { name: 'brake_pads.jpg', type: 'image/jpeg', size: 1024000 },
       { name: 'invoice.pdf', type: 'application/pdf', size: 512000 }
     ],
-    comments: ['Customer mentioned squeaking noise', 'Needs urgent attention'],
+    comments: [
+      { id: '1', text: 'Customer mentioned squeaking noise', author: 'Admin', timestamp: new Date().toISOString() },
+      { id: '2', text: 'Needs urgent attention', author: 'Admin', timestamp: new Date().toISOString() }
+    ],
   });
 
   await dataProvider.createRequirement({
@@ -247,7 +250,10 @@ export async function seed() {
     attachments: [
       { name: 'oil_change_video.mp4', type: 'video/mp4', size: 2048000 }
     ],
-    comments: ['Regular customer', 'Prefers synthetic oil'],
+    comments: [
+      { id: '3', text: 'Regular customer', author: 'Admin', timestamp: new Date().toISOString() },
+      { id: '4', text: 'Prefers synthetic oil', author: 'Admin', timestamp: new Date().toISOString() }
+    ],
   });
 
   await dataProvider.createRequirement({
@@ -260,7 +266,10 @@ export async function seed() {
       { name: 'before_photos.jpg', type: 'image/jpeg', size: 1536000 },
       { name: 'after_photos.jpg', type: 'image/jpeg', size: 1280000 }
     ],
-    comments: ['Excellent service', 'Will recommend to friends'],
+    comments: [
+      { id: '5', text: 'Excellent service', author: 'Admin', timestamp: new Date().toISOString() },
+      { id: '6', text: 'Will recommend to friends', author: 'Admin', timestamp: new Date().toISOString() }
+    ],
   });
 
   console.log('Seed data created successfully');

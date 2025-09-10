@@ -40,7 +40,12 @@ export default function CustomerRequirement() {
       size: number;
       file?: File; // Store the actual File object
     }>,
-    comments: [] as string[],
+    comments: [] as Array<{
+      id: string;
+      text: string;
+      author: string;
+      timestamp: string;
+    }>,
   });
   const [newComment, setNewComment] = useState('');
 
