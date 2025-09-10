@@ -140,9 +140,13 @@ export default class SupabaseProvider implements DataProvider {
   async createServiceJob(payload: any) {
     await this.debugAuth();
     console.log('📝 Creating service job with payload:', payload);
+    
+    // Extract attachments and comments from payload (they're stored in separate tables)
+    const { attachments, comments, ...dbData } = payload;
+    
     const { data, error } = await supabase
       .from('service_jobs')
-      .insert(payload)
+      .insert(dbData)
       .select()
       .single()
     if (error) {
@@ -150,19 +154,33 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Service job created:', data);
+    
+    // Upload attachments if any
+    if (attachments && attachments.length > 0) {
+      for (const attachment of attachments) {
+        if (attachment.file) {
+          await this.uploadAttachment('service_job', data.id, attachment.file);
+        }
+      }
+    }
+    
     return {
       ...data,
-      attachments: [],
-      comments: [],
+      attachments: attachments || [],
+      comments: comments || [],
     } as ServiceJob;
   }
 
   async updateServiceJob(id: Id, patch: any) {
     await this.debugAuth();
     console.log('📝 Updating service job:', id, patch);
+    
+    // Extract attachments and comments from patch (they're stored in separate tables)
+    const { attachments, comments, ...dbData } = patch;
+    
     const { data, error } = await supabase
       .from('service_jobs')
-      .update(patch)
+      .update(dbData)
       .eq('id', id)
       .select()
       .single()
@@ -171,10 +189,20 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Service job updated:', data);
+    
+    // Upload new attachments if any
+    if (attachments && attachments.length > 0) {
+      for (const attachment of attachments) {
+        if (attachment.file) {
+          await this.uploadAttachment('service_job', id, attachment.file);
+        }
+      }
+    }
+    
     return {
       ...data,
-      attachments: [],
-      comments: [],
+      attachments: attachments || [],
+      comments: comments || [],
     } as ServiceJob;
   }
 
@@ -343,9 +371,13 @@ export default class SupabaseProvider implements DataProvider {
   async createRequirement(payload: any) {
     await this.debugAuth();
     console.log('📝 Creating requirement with payload:', payload);
+    
+    // Extract attachments and comments from payload (they're stored in separate tables)
+    const { attachments, comments, ...dbData } = payload;
+    
     const { data, error } = await supabase
       .from('requirements')
-      .insert(payload)
+      .insert(dbData)
       .select()
       .single()
     if (error) {
@@ -353,19 +385,33 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Requirement created:', data);
+    
+    // Upload attachments if any
+    if (attachments && attachments.length > 0) {
+      for (const attachment of attachments) {
+        if (attachment.file) {
+          await this.uploadAttachment('requirement', data.id, attachment.file);
+        }
+      }
+    }
+    
     return {
       ...data,
-      attachments: [],
-      comments: [],
+      attachments: attachments || [],
+      comments: comments || [],
     } as unknown as Requirement;
   }
 
   async updateRequirement(id: Id, patch: any) {
     await this.debugAuth();
     console.log('📝 Updating requirement:', id, patch);
+    
+    // Extract attachments and comments from patch (they're stored in separate tables)
+    const { attachments, comments, ...dbData } = patch;
+    
     const { data, error } = await supabase
       .from('requirements')
-      .update(patch)
+      .update(dbData)
       .eq('id', id)
       .select()
       .single()
@@ -374,10 +420,20 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Requirement updated:', data);
+    
+    // Upload new attachments if any
+    if (attachments && attachments.length > 0) {
+      for (const attachment of attachments) {
+        if (attachment.file) {
+          await this.uploadAttachment('requirement', id, attachment.file);
+        }
+      }
+    }
+    
     return {
       ...data,
-      attachments: [],
-      comments: [],
+      attachments: attachments || [],
+      comments: comments || [],
     } as unknown as Requirement;
   }
 
