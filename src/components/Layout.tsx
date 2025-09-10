@@ -1,7 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
-  Users,
   UserPlus,
   Wrench,
   FileText,

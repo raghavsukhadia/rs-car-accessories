@@ -78,9 +78,9 @@ export default function CustomerRequirement() {
     
     // Convert database attachments to form attachment structure
     const formAttachments = (requirement.attachments || []).map(attachment => ({
-      name: attachment.file_name || 'Unknown file',
-      type: attachment.file_type || 'application/octet-stream',
-      size: attachment.file_size || 0,
+      name: attachment.name || 'Unknown file',
+      type: attachment.type || 'application/octet-stream',
+      size: attachment.size || 0,
       file: undefined // No file object for existing attachments
     }));
     
@@ -148,7 +148,11 @@ export default function CustomerRequirement() {
         await dataProvider.updateRequirement(editingRequirement.id, dbData);
         requirementId = editingRequirement.id;
       } else {
-        const newRequirement = await dataProvider.createRequirement(dbData);
+        const newRequirement = await dataProvider.createRequirement({
+          ...dbData,
+          attachments: [],
+          comments: [],
+        });
         requirementId = newRequirement.id;
       }
       
@@ -618,12 +622,12 @@ export default function CustomerRequirement() {
             <div className="mt-6">
               <h5 className="text-sm font-medium text-gray-900 mb-3">Previous Comments:</h5>
               <div className="space-y-2">
-                {selectedRequirement.comments.map((comment, index) => (
+                {(selectedRequirement?.comments || []).map((comment, index) => (
                   <div key={comment.id || index} className="bg-gray-50 p-3 rounded-md">
                     <div className="flex justify-between items-start mb-1">
                       <span className="text-xs font-medium text-gray-600">{comment.author}</span>
                       <span className="text-xs text-gray-500">
-                        {comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'Just now'}
+                        {new Date(comment.timestamp).toLocaleString()}
                       </span>
                     </div>
                     <p className="text-sm text-gray-700">{comment.text}</p>
@@ -653,23 +657,23 @@ export default function CustomerRequirement() {
           
           {(selectedRequirement?.attachments || []).length > 0 ? (
             <div className="space-y-3">
-              {selectedRequirement.attachments.map((attachment, index) => (
-                <div key={attachment.id || index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+              {(selectedRequirement?.attachments || []).map((attachment, index) => (
+                <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                   <div className="flex items-center">
-                    {attachment.file_name?.toLowerCase().includes('.pdf') && <FileText className="h-5 w-5 text-red-500 mr-3" />}
-                    {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Image className="h-5 w-5 text-green-500 mr-3" />}
-                    {['.mp4', '.avi', '.mov'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Video className="h-5 w-5 text-blue-500 mr-3" />}
+                    {attachment.name?.toLowerCase().includes('.pdf') && <FileText className="h-5 w-5 text-red-500 mr-3" />}
+                    {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Image className="h-5 w-5 text-green-500 mr-3" />}
+                    {['.mp4', '.avi', '.mov'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Video className="h-5 w-5 text-blue-500 mr-3" />}
                     <div>
-                      <span className="text-sm font-medium text-gray-900">{attachment.file_name}</span>
+                      <span className="text-sm font-medium text-gray-900">{attachment.name}</span>
                       <p className="text-xs text-gray-500">
-                        {(attachment.file_size / 1024).toFixed(1)} KB • {attachment.file_type}
+                        {(attachment.size / 1024).toFixed(1)} KB • {attachment.type}
                       </p>
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    {attachment.signed_url ? (
+                    {attachment.data ? (
                       <a
-                        href={attachment.signed_url}
+                        href={attachment.data}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-900 text-sm"
@@ -686,12 +690,12 @@ export default function CustomerRequirement() {
                         View
                       </button>
                     )}
-                    {attachment.signed_url && (
+                    {attachment.data && (
                       <button
                         onClick={() => {
                           const link = document.createElement('a');
-                          link.href = attachment.signed_url;
-                          link.download = attachment.file_name;
+                          link.href = attachment.data || '#';
+                          link.download = attachment.name;
                           link.click();
                         }}
                         className="text-green-600 hover:text-green-800 text-sm"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Calendar, User, Car, Paperclip, FileText, Image, Video, Wrench, MessageSquare, Send } from 'lucide-react';
-import { dataProvider, ServiceJob, Product } from '../lib/data';
+import { Search, Plus, Edit, Trash2, Calendar, Car, Paperclip, FileText, Image, Video, Wrench, MessageSquare, Send } from 'lucide-react';
+import { dataProvider, ServiceJob } from '../lib/data';
 import Modal from '../components/Modal';
 
 const statusColors = {
@@ -13,10 +13,10 @@ const statusColors = {
 
 export default function ServiceTracker() {
   const [serviceJobs, setServiceJobs] = useState<ServiceJob[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  // const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  // const [selectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
@@ -53,12 +53,12 @@ export default function ServiceTracker() {
 
   const loadData = async () => {
     try {
-      const [serviceJobsData, productsData] = await Promise.all([
+      const [serviceJobsData] = await Promise.all([
         dataProvider.getServiceJobs(),
-        dataProvider.getProducts(),
+        // dataProvider.getProducts(),
       ]);
       setServiceJobs(serviceJobsData);
-      setProducts(productsData);
+      // setProducts(productsData);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -126,7 +126,7 @@ export default function ServiceTracker() {
     e.preventDefault();
     try {
       // Filter out fields that shouldn't be sent to the database
-      const { attachments, comments, ...dbData } = formData;
+      const { attachments, ...dbData } = formData;
       
       let serviceJobId: string;
       
@@ -134,7 +134,11 @@ export default function ServiceTracker() {
         await dataProvider.updateServiceJob(editingServiceJob.id, dbData);
         serviceJobId = editingServiceJob.id;
       } else {
-        const newServiceJob = await dataProvider.createServiceJob(dbData);
+        const newServiceJob = await dataProvider.createServiceJob({
+          ...dbData,
+          attachments: [],
+          comments: [],
+        });
         serviceJobId = newServiceJob.id;
       }
       
@@ -219,23 +223,18 @@ export default function ServiceTracker() {
   };
 
   const statuses = ['All', 'New Complaint', 'Under Inspection', 'Sent to Service Centre', 'Received', 'Completed'];
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
+  // const categories = ['All'];
 
   const filteredServiceJobs = serviceJobs.filter((serviceJob) => {
     const matchesSearch = (serviceJob.modal_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (serviceJob.modal_registration_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (serviceJob.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (serviceJob.service_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (serviceJob.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatus === 'All' || serviceJob.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.description || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // const filteredProducts = products;
 
   // Dashboard stats
   const dashboardStats = {
@@ -624,7 +623,7 @@ export default function ServiceTracker() {
                       {attachment.name?.toLowerCase().includes('.pdf') && <FileText className="h-4 w-4 text-red-500 mr-2" />}
                       {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Image className="h-4 w-4 text-green-500 mr-2" />}
                       {['.mp4', '.avi', '.mov'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Video className="h-4 w-4 text-blue-500 mr-2" />}
-                      <span className="text-sm text-gray-700">{attachment.name || attachment}</span>
+                      <span className="text-sm text-gray-700">{attachment.name}</span>
                     </div>
                     <button
                       type="button"
@@ -675,23 +674,23 @@ export default function ServiceTracker() {
           
           {(selectedServiceJob?.attachments || []).length > 0 ? (
             <div className="space-y-3">
-              {selectedServiceJob.attachments.map((attachment, index) => (
-                <div key={attachment.id || index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+              {(selectedServiceJob?.attachments || []).map((attachment, index) => (
+                <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                   <div className="flex items-center">
-                    {attachment.file_name?.toLowerCase().includes('.pdf') && <FileText className="h-5 w-5 text-red-500 mr-3" />}
-                    {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Image className="h-5 w-5 text-green-500 mr-3" />}
-                    {['.mp4', '.avi', '.mov'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Video className="h-5 w-5 text-blue-500 mr-3" />}
+                    {attachment.name?.toLowerCase().includes('.pdf') && <FileText className="h-5 w-5 text-red-500 mr-3" />}
+                    {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Image className="h-5 w-5 text-green-500 mr-3" />}
+                    {['.mp4', '.avi', '.mov'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Video className="h-5 w-5 text-blue-500 mr-3" />}
                     <div>
-                      <span className="text-sm font-medium text-gray-900">{attachment.file_name}</span>
+                      <span className="text-sm font-medium text-gray-900">{attachment.name}</span>
                       <p className="text-xs text-gray-500">
-                        {(attachment.file_size / 1024).toFixed(1)} KB • {attachment.file_type}
+                        {(attachment.size / 1024).toFixed(1)} KB • {attachment.type}
                       </p>
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    {attachment.signed_url ? (
+                    {attachment.data ? (
                       <a
-                        href={attachment.signed_url}
+                        href={attachment.data}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-900 text-sm"
@@ -708,12 +707,12 @@ export default function ServiceTracker() {
                         View
                       </button>
                     )}
-                    {attachment.signed_url && (
+                    {attachment.data && (
                       <button
                         onClick={() => {
                           const link = document.createElement('a');
-                          link.href = attachment.signed_url;
-                          link.download = attachment.file_name;
+                          link.href = attachment.data || '#';
+                          link.download = attachment.name;
                           link.click();
                         }}
                         className="text-green-600 hover:text-green-800 text-sm"
@@ -776,29 +775,29 @@ export default function ServiceTracker() {
                     <p className="text-xs font-medium text-gray-600">Attachments:</p>
                     <div className="space-y-1">
                       {comment.attachments.map((attachment, index) => (
-                        <div key={attachment.id || index} className="flex items-center justify-between bg-white p-2 rounded border">
+                        <div key={index} className="flex items-center justify-between bg-white p-2 rounded border">
                           <div className="flex items-center">
-                            {attachment.file_name?.toLowerCase().includes('.pdf') && <FileText className="h-4 w-4 text-red-500 mr-2" />}
-                            {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Image className="h-4 w-4 text-green-500 mr-2" />}
-                            {['.mp4', '.avi', '.mov'].some(ext => attachment.file_name?.toLowerCase().includes(ext)) && <Video className="h-4 w-4 text-blue-500 mr-2" />}
-                            <span className="text-xs text-gray-700">{attachment.file_name}</span>
-                            <span className="text-xs text-gray-500 ml-2">({Math.round(attachment.file_size / 1024)}KB)</span>
+                            {attachment.name?.toLowerCase().includes('.pdf') && <FileText className="h-4 w-4 text-red-500 mr-2" />}
+                            {['.jpg', '.jpeg', '.png', '.gif'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Image className="h-4 w-4 text-green-500 mr-2" />}
+                            {['.mp4', '.avi', '.mov'].some(ext => attachment.name?.toLowerCase().includes(ext)) && <Video className="h-4 w-4 text-blue-500 mr-2" />}
+                            <span className="text-xs text-gray-700">{attachment.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({Math.round(attachment.size / 1024)}KB)</span>
                           </div>
                           <div className="flex space-x-2">
-                            {attachment.signed_url && (
+                            {attachment.data && (
                               <button
-                                onClick={() => window.open(attachment.signed_url, '_blank')}
+                                onClick={() => window.open(attachment.data, '_blank')}
                                 className="text-blue-600 hover:text-blue-900 text-xs"
                               >
                                 View
                               </button>
                             )}
-                            {attachment.signed_url && (
+                            {attachment.data && (
                               <button
                                 onClick={() => {
                                   const link = document.createElement('a');
-                                  link.href = attachment.signed_url;
-                                  link.download = attachment.file_name;
+                                  link.href = attachment.data || '#';
+                                  link.download = attachment.name;
                                   link.click();
                                 }}
                                 className="text-green-600 hover:text-green-900 text-xs"

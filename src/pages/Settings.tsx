@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { User, Clock } from 'lucide-react';
 
 export default function Settings() {

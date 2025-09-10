@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, Users, TrendingUp, DollarSign, Phone, Calendar, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { BarChart3, Users, Phone, Calendar, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { dataProvider, CallFollowUp, ServiceJob, Requirement } from '../lib/data';
 import AuthDebug from '../components/AuthDebug';
 

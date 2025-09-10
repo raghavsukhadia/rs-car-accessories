@@ -321,6 +321,17 @@ class MockProvider implements DataProvider {
     await this.saveToStorage('requirements', filtered);
   }
 
+  async addRequirementComment(requirementId: string, comment: any) {
+    console.log('MockProvider: addRequirementComment called', requirementId, comment);
+    const requirements = await this.getRequirements();
+    const requirement = requirements.find(r => r.id === requirementId);
+    if (requirement) {
+      requirement.comments.push(comment.text);
+      await this.saveToStorage('requirements', requirements);
+    }
+    return requirement as Requirement;
+  }
+
   // Quotes
   async getQuotes(): Promise<Quote[]> {
     return this.getFromStorage<Quote>('quotes');
@@ -524,6 +535,21 @@ class MockProvider implements DataProvider {
     const invoices = await this.getInvoices();
     const filtered = invoices.filter(i => i.id !== id);
     await this.saveToStorage('invoices', filtered);
+  }
+
+  // Attachments
+  async uploadAttachment(entityType: string, entityId: string, file: File) {
+    console.log('MockProvider: uploadAttachment called', entityType, entityId, file.name);
+    return { id: 'mock-attachment-id', file_name: file.name };
+  }
+
+  async listAttachments(entityType: string, entityId: string) {
+    console.log('MockProvider: listAttachments called', entityType, entityId);
+    return [];
+  }
+
+  async deleteAttachment(id: string) {
+    console.log('MockProvider: deleteAttachment called', id);
   }
 
   // Payments

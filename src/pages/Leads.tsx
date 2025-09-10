@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Phone, Mail, Calendar, User, Clock, AlertCircle, CheckCircle, XCircle, Pause, Play } from 'lucide-react';
-import { dataProvider, CallFollowUp, Customer } from '../lib/data';
+import { Search, Plus, Edit, Trash2, Clock, AlertCircle, CheckCircle, XCircle, Play } from 'lucide-react';
+import { dataProvider, CallFollowUp } from '../lib/data';
 import Modal from '../components/Modal';
 
 const statusColors = {
@@ -19,7 +19,7 @@ const priorityColors = {
 
 export default function CallFollowUpPage() {
   const [calls, setCalls] = useState<CallFollowUp[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  // const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [loading, setLoading] = useState(true);
@@ -43,12 +43,12 @@ export default function CallFollowUpPage() {
 
   const loadData = async () => {
     try {
-      const [callsData, customersData] = await Promise.all([
+      const [callsData] = await Promise.all([
         dataProvider.getCallFollowUps(),
-        dataProvider.getCustomers(),
+        // dataProvider.getCustomers(),
       ]);
       setCalls(callsData);
-      setCustomers(customersData);
+      // setCustomers(customersData);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -56,12 +56,12 @@ export default function CallFollowUpPage() {
     }
   };
 
-  const getCustomerDetails = (personToContact: string) => {
-    return customers.find(customer => 
-      customer.name.toLowerCase().includes(personToContact.toLowerCase()) ||
-      personToContact.toLowerCase().includes(customer.name.toLowerCase())
-    );
-  };
+  // const getCustomerDetails = (personToContact: string) => {
+  //   return customers.find(customer => 
+  //     customer.name.toLowerCase().includes(personToContact.toLowerCase()) ||
+  //     personToContact.toLowerCase().includes(customer.name.toLowerCase())
+  //   );
+  // };
 
   const calculateResponseTime = (timestamp: string, statusChangeTime?: string) => {
     const startTime = new Date(timestamp);

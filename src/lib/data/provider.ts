@@ -93,7 +93,12 @@ export interface Requirement {
     size: number;
     data?: string; // blob URL for viewing
   }>;
-  comments: string[];
+  comments: Array<{
+    id: string;
+    text: string;
+    author: string;
+    timestamp: string;
+  }>;
   created_at: string;
   updated_at: string;
 }
@@ -202,6 +207,7 @@ export interface DataProvider {
   createRequirement(requirement: Omit<Requirement, 'id' | 'created_at' | 'updated_at'>): Promise<Requirement>;
   updateRequirement(id: string, updates: Partial<Requirement>): Promise<Requirement>;
   deleteRequirement(id: string): Promise<void>;
+  addRequirementComment(requirementId: string, comment: any): Promise<Requirement>;
 
   // Quotes
   getQuotes(): Promise<Quote[]>;
@@ -236,6 +242,11 @@ export interface DataProvider {
   createInvoice(invoice: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>): Promise<Invoice>;
   updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice>;
   deleteInvoice(id: string): Promise<void>;
+
+  // Attachments
+  uploadAttachment(entityType: string, entityId: string, file: File): Promise<any>;
+  listAttachments(entityType: string, entityId: string): Promise<any[]>;
+  deleteAttachment(id: string): Promise<void>;
 
   // Payments
   getPayments(invoiceId: string): Promise<Payment[]>;

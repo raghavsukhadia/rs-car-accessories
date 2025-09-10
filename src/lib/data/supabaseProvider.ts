@@ -1,6 +1,6 @@
 // src/lib/data/supabaseProvider.ts
 import { supabase } from '../supabase'
-import type { DataProvider } from './provider'
+import type { DataProvider, CallFollowUp, ServiceJob, Requirement, Customer, Lead, LeadCall, Product } from './provider'
 
 type Id = string
 
@@ -28,9 +28,15 @@ export default class SupabaseProvider implements DataProvider {
       console.error('❌ Error getting call follow-ups:', error);
       throw error;
     }
-    console.log('✅ Call follow-ups loaded:', data?.length || 0);
-    return data
+    console.log('✅ Call follow-ups retrieved:', data);
+    return (data || []).map(item => ({
+      ...item,
+      response_time: item.response_time || undefined,
+      call_outcome: item.call_outcome || undefined,
+      time_to_respond: item.time_to_respond || undefined,
+    })) as CallFollowUp[];
   }
+
   async createCallFollowUp(payload: any) {
     await this.debugAuth();
     console.log('📝 Creating call follow-up with payload:', payload);
@@ -44,22 +50,48 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Call follow-up created:', data);
-    return data
+    return {
+      ...data,
+      response_time: data.response_time || undefined,
+      call_outcome: data.call_outcome || undefined,
+      time_to_respond: data.time_to_respond || undefined,
+    } as CallFollowUp;
   }
+
   async updateCallFollowUp(id: Id, patch: any) {
+    await this.debugAuth();
+    console.log('📝 Updating call follow-up:', id, patch);
     const { data, error } = await supabase
       .from('call_followups')
       .update(patch)
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('❌ Error updating call follow-up:', error);
+      throw error;
+    }
+    console.log('✅ Call follow-up updated:', data);
+    return {
+      ...data,
+      response_time: data.response_time || undefined,
+      call_outcome: data.call_outcome || undefined,
+      time_to_respond: data.time_to_respond || undefined,
+    } as CallFollowUp;
   }
+
   async deleteCallFollowUp(id: Id) {
-    const { error } = await supabase.from('call_followups').delete().eq('id', id)
-    if (error) throw error
-    return { id }
+    await this.debugAuth();
+    console.log('🗑️ Deleting call follow-up:', id);
+    const { error } = await supabase
+      .from('call_followups')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('❌ Error deleting call follow-up:', error);
+      throw error;
+    }
+    console.log('✅ Call follow-up deleted');
   }
 
   // ---------- Service Jobs ----------
@@ -69,26 +101,42 @@ export default class SupabaseProvider implements DataProvider {
     const { data, error } = await supabase
       .from('service_jobs')
       .select('*')
-      .order('scheduled_at', { ascending: true })
+      .order('created_at', { ascending: false })
     if (error) {
       console.error('❌ Error getting service jobs:', error);
       throw error;
     }
-    console.log('✅ Service jobs loaded:', data?.length || 0);
+    console.log('✅ Service jobs retrieved:', data);
     
-    // Load attachments and comments for each service job
-    const serviceJobsWithAttachmentsAndComments = await Promise.all(
-      (data || []).map(async (job) => {
-        const [attachments, comments] = await Promise.all([
-          this.listAttachments('service_job', job.id),
-          this.listServiceJobComments(job.id)
-        ]);
-        return { ...job, attachments, comments };
+    // Fetch attachments and comments for each service job
+    const serviceJobsWithAttachments = await Promise.all(
+      (data || []).map(async (item) => {
+        const attachments = await this.listAttachments('service_job', item.id);
+        const comments = await this.listServiceJobComments(item.id);
+        
+        return {
+          ...item,
+          attachments: attachments.map(att => ({
+            name: att.file_name,
+            type: att.file_type,
+            size: att.file_size,
+            data: att.signed_url
+          })),
+          comments: comments.map(comment => ({
+            id: comment.id,
+            text: comment.text,
+            author: comment.author,
+            timestamp: comment.timestamp,
+            attachments: comment.attachments || []
+          }))
+        };
       })
     );
     
-    return serviceJobsWithAttachmentsAndComments;
+    console.log('✅ Service jobs with attachments and comments:', serviceJobsWithAttachments);
+    return serviceJobsWithAttachments as ServiceJob[];
   }
+
   async createServiceJob(payload: any) {
     await this.debugAuth();
     console.log('📝 Creating service job with payload:', payload);
@@ -102,72 +150,152 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Service job created:', data);
-    return data
+    return {
+      ...data,
+      attachments: [],
+      comments: [],
+    } as ServiceJob;
   }
+
   async updateServiceJob(id: Id, patch: any) {
+    await this.debugAuth();
+    console.log('📝 Updating service job:', id, patch);
     const { data, error } = await supabase
       .from('service_jobs')
       .update(patch)
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
-    return data
-  }
-  async deleteServiceJob(id: Id) {
-    const { error } = await supabase.from('service_jobs').delete().eq('id', id)
-    if (error) throw error
-    return { id }
+    if (error) {
+      console.error('❌ Error updating service job:', error);
+      throw error;
+    }
+    console.log('✅ Service job updated:', data);
+    return {
+      ...data,
+      attachments: [],
+      comments: [],
+    } as ServiceJob;
   }
 
-  // ---------- Service Job Comments ----------
-  async listServiceJobComments(service_job_id: Id) {
+  async deleteServiceJob(id: Id) {
+    await this.debugAuth();
+    console.log('🗑️ Deleting service job:', id);
+    const { error } = await supabase
+      .from('service_jobs')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('❌ Error deleting service job:', error);
+      throw error;
+    }
+    console.log('✅ Service job deleted');
+  }
+
+  async listServiceJobComments(serviceJobId: Id) {
+    await this.debugAuth();
+    console.log('💬 Listing service job comments:', serviceJobId);
     const { data, error } = await supabase
       .from('service_job_comments')
       .select('*')
-      .eq('service_job_id', service_job_id)
-      .order('timestamp', { ascending: false })
-    if (error) throw error
+      .eq('service_job_id', serviceJobId)
+      .order('timestamp', { ascending: false });
     
-    console.log('🔍 Loading comments for service job:', service_job_id, 'Found:', data?.length || 0);
+    if (error) {
+      console.error('❌ Error listing service job comments:', error);
+      throw error;
+    }
     
-    // Load attachments for each comment
+    // Fetch attachments for each comment
     const commentsWithAttachments = await Promise.all(
       (data || []).map(async (comment) => {
         const attachments = await this.listAttachments('service_job_comment', comment.id);
-        console.log('📎 Comment', comment.id, 'has', attachments.length, 'attachments');
-        return { ...comment, attachments };
+        return {
+          ...comment,
+          attachments: attachments.map(att => ({
+            name: att.file_name,
+            type: att.file_type,
+            size: att.file_size,
+            data: att.signed_url
+          }))
+        };
       })
     );
     
-    return commentsWithAttachments
+    console.log('✅ Service job comments with attachments:', commentsWithAttachments);
+    return commentsWithAttachments;
   }
-  async addServiceJobComment(service_job_id: Id, comment: any) {
+
+  // ---------- Service Job Comments ----------
+  async addServiceJobComment(serviceJobId: Id, comment: any) {
+    await this.debugAuth();
+    console.log('📝 Adding service job comment:', serviceJobId, comment);
     const { data, error } = await supabase
       .from('service_job_comments')
-      .insert({ ...comment, service_job_id })
+      .insert({
+        service_job_id: serviceJobId,
+        text: comment.text,
+        author: comment.author,
+      })
       .select()
       .single()
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('❌ Error adding service job comment:', error);
+      throw error;
+    }
+    console.log('✅ Service job comment added:', data);
+    return {
+      ...data,
+      attachments: [],
+    } as unknown as ServiceJob;
   }
-  async updateServiceJobComment(id: Id, patch: any) {
+
+  async updateServiceJobComment(_serviceJobId: Id, commentId: Id, updates: any) {
+    await this.debugAuth();
+    console.log('📝 Updating service job comment:', commentId, updates);
     const { data, error } = await supabase
       .from('service_job_comments')
-      .update(patch)
-      .eq('id', id)
+      .update(updates)
+      .eq('id', commentId)
       .select()
       .single()
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('❌ Error updating service job comment:', error);
+      throw error;
+    }
+    console.log('✅ Service job comment updated:', data);
+    return {
+      ...data,
+      attachments: [],
+    } as unknown as ServiceJob;
   }
-  async deleteServiceJobComment(id: Id) {
+
+  async deleteServiceJobComment(serviceJobId: Id, commentId: Id) {
+    await this.debugAuth();
+    console.log('🗑️ Deleting service job comment:', commentId);
     const { error } = await supabase
       .from('service_job_comments')
       .delete()
-      .eq('id', id)
-    if (error) throw error
-    return { id }
+      .eq('id', commentId)
+    if (error) {
+      console.error('❌ Error deleting service job comment:', error);
+      throw error;
+    }
+    console.log('✅ Service job comment deleted');
+    return {
+      id: serviceJobId,
+      modal_name: '',
+      modal_registration_number: '',
+      customer_name: '',
+      customer_number: '',
+      description: '',
+      status: 'Received' as const,
+      attachments: [],
+      comments: [],
+      scheduled_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as ServiceJob;
   }
 
   // ---------- Requirements ----------
@@ -182,21 +310,36 @@ export default class SupabaseProvider implements DataProvider {
       console.error('❌ Error getting requirements:', error);
       throw error;
     }
-    console.log('✅ Requirements loaded:', data?.length || 0);
+    console.log('✅ Requirements retrieved:', data);
     
-    // Load attachments and comments for each requirement
-    const requirementsWithAttachmentsAndComments = await Promise.all(
-      (data || []).map(async (requirement) => {
-        const [attachments, comments] = await Promise.all([
-          this.listAttachments('requirement', requirement.id),
-          this.listRequirementComments(requirement.id)
-        ]);
-        return { ...requirement, attachments, comments };
+    // Fetch attachments and comments for each requirement
+    const requirementsWithAttachments = await Promise.all(
+      (data || []).map(async (item) => {
+        const attachments = await this.listAttachments('requirement', item.id);
+        const comments = await this.listRequirementComments(item.id);
+        
+        return {
+          ...item,
+          attachments: attachments.map(att => ({
+            name: att.file_name,
+            type: att.file_type,
+            size: att.file_size,
+            data: att.signed_url
+          })),
+          comments: comments.map(comment => ({
+            id: comment.id,
+            text: comment.text,
+            author: comment.author,
+            timestamp: comment.timestamp
+          }))
+        };
       })
     );
     
-    return requirementsWithAttachmentsAndComments;
+    console.log('✅ Requirements with attachments and comments:', requirementsWithAttachments);
+    return requirementsWithAttachments as Requirement[];
   }
+
   async createRequirement(payload: any) {
     await this.debugAuth();
     console.log('📝 Creating requirement with payload:', payload);
@@ -210,125 +353,253 @@ export default class SupabaseProvider implements DataProvider {
       throw error;
     }
     console.log('✅ Requirement created:', data);
-    return data
+    return {
+      ...data,
+      attachments: [],
+      comments: [],
+    } as unknown as Requirement;
   }
+
   async updateRequirement(id: Id, patch: any) {
+    await this.debugAuth();
+    console.log('📝 Updating requirement:', id, patch);
     const { data, error } = await supabase
       .from('requirements')
       .update(patch)
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
-    return data
-  }
-  async deleteRequirement(id: Id) {
-    const { error } = await supabase.from('requirements').delete().eq('id', id)
-    if (error) throw error
-    return { id }
+    if (error) {
+      console.error('❌ Error updating requirement:', error);
+      throw error;
+    }
+    console.log('✅ Requirement updated:', data);
+    return {
+      ...data,
+      attachments: [],
+      comments: [],
+    } as unknown as Requirement;
   }
 
-  // Requirement comments
-  async listRequirementComments(requirement_id: Id) {
+  async deleteRequirement(id: Id) {
+    await this.debugAuth();
+    console.log('🗑️ Deleting requirement:', id);
+    const { error } = await supabase
+      .from('requirements')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('❌ Error deleting requirement:', error);
+      throw error;
+    }
+    console.log('✅ Requirement deleted');
+  }
+
+  async listRequirementComments(requirementId: Id) {
+    await this.debugAuth();
+    console.log('💬 Listing requirement comments:', requirementId);
     const { data, error } = await supabase
       .from('requirement_comments')
       .select('*')
-      .eq('requirement_id', requirement_id)
-      .order('timestamp', { ascending: false })
-    if (error) throw error
-    return data
-  }
-  async addRequirementComment(requirement_id: Id, comment: any) {
-    const { data, error } = await supabase
-      .from('requirement_comments')
-      .insert({ ...comment, requirement_id })
-      .select()
-      .single()
-    if (error) throw error
-    return data
-  }
-  async deleteRequirementComment(id: Id) {
-    const { error } = await supabase
-      .from('requirement_comments')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-    return { id }
-  }
-
-  // ---------- Attachments (Storage + table) ----------
-  private BUCKET = 'attachments'
-  async uploadAttachment(entity_type: string, entity_id: Id, file: File) {
-    await this.debugAuth();
-    console.log('📎 Uploading attachment:', { entity_type, entity_id, fileName: file.name, fileSize: file.size });
+      .eq('requirement_id', requirementId)
+      .order('timestamp', { ascending: false });
     
-    const ext = file.name.split('.').pop() || 'bin'
-    const key = `${entity_type}/${entity_id}/${crypto.randomUUID()}.${ext}`
-
-    const up = await supabase.storage.from(this.BUCKET).upload(key, file, { upsert: false })
-    if (up.error) {
-      console.error('❌ Error uploading file to storage:', up.error);
-      throw up.error;
+    if (error) {
+      console.error('❌ Error listing requirement comments:', error);
+      throw error;
     }
-    console.log('✅ File uploaded to storage:', key);
+    
+    console.log('✅ Requirement comments:', data);
+    return data || [];
+  }
 
+  // ---------- Requirement Comments ----------
+  async addRequirementComment(requirementId: Id, comment: any) {
+    await this.debugAuth();
+    console.log('📝 Adding requirement comment:', requirementId, comment);
     const { data, error } = await supabase
-      .from('attachments')
+      .from('requirement_comments')
       .insert({
-        entity_type,
-        entity_id,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        storage_path: key
+        requirement_id: requirementId,
+        text: comment.text,
+        author: comment.author,
       })
       .select()
       .single()
+    if (error) {
+      console.error('❌ Error adding requirement comment:', error);
+      throw error;
+    }
+    console.log('✅ Requirement comment added:', data);
+    return {
+      ...data,
+      attachments: [],
+      comments: [],
+    } as unknown as Requirement;
+  }
+
+  // ---------- Attachments ----------
+  async uploadAttachment(entityType: string, entityId: Id, file: File) {
+    await this.debugAuth();
+    console.log('📎 Uploading attachment:', entityType, entityId, file.name);
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${entityType}_${entityId}_${Date.now()}.${fileExt}`;
+    const filePath = `${entityType}/${entityId}/${fileName}`;
+
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('attachments')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('❌ Error uploading file:', uploadError);
+      throw uploadError;
+    }
+
+    // Get signed URL
+    const { data: urlData } = await supabase.storage
+      .from('attachments')
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 year
+
+    // Save attachment metadata
+    const { data, error } = await supabase
+      .from('attachments')
+      .insert({
+        entity_type: entityType,
+        entity_id: entityId,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        storage_path: filePath,
+      })
+      .select()
+      .single();
+
     if (error) {
       console.error('❌ Error saving attachment metadata:', error);
       throw error;
     }
-    console.log('✅ Attachment metadata saved:', data);
-    return data
+
+    console.log('✅ Attachment uploaded:', data);
+    return {
+      ...data,
+      signed_url: urlData?.signedUrl || null,
+    };
   }
 
-  async listAttachments(entity_type: string, entity_id: Id) {
-    console.log('🔍 Listing attachments for:', { entity_type, entity_id });
+  async listAttachments(entityType: string, entityId: Id) {
+    await this.debugAuth();
+    console.log('📎 Listing attachments:', entityType, entityId);
     
     const { data, error } = await supabase
       .from('attachments')
       .select('*')
-      .eq('entity_type', entity_type)
-      .eq('entity_id', entity_id)
-      .order('created_at', { ascending: false })
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId);
+
     if (error) {
       console.error('❌ Error listing attachments:', error);
       throw error;
     }
-    
-    console.log('📎 Found attachments:', data?.length || 0, data);
 
-    const withUrls = await Promise.all(
-      (data ?? []).map(async (row) => {
-        const u = await supabase.storage.from(this.BUCKET).createSignedUrl(row.storage_path, 60 * 60)
-        console.log('🔗 Generated signed URL for:', row.file_name, u.data?.signedUrl ? 'SUCCESS' : 'FAILED');
-        return { ...row, signed_url: u.data?.signedUrl ?? null }
+    // Get signed URLs for each attachment
+    const attachmentsWithUrls = await Promise.all(
+      (data || []).map(async (attachment) => {
+        const { data: urlData } = await supabase.storage
+          .from('attachments')
+          .createSignedUrl(attachment.storage_path, 60 * 60 * 24 * 365);
+        
+        return {
+          ...attachment,
+          signed_url: urlData?.signedUrl || null,
+        };
       })
-    )
-    return withUrls
+    );
+
+    console.log('✅ Attachments listed:', attachmentsWithUrls);
+    return attachmentsWithUrls;
   }
 
-  async deleteAttachment(id: Id, storage_path: string) {
-    const s = await supabase.storage.from(this.BUCKET).remove([storage_path])
-    if (s.error) throw s.error
-    const { error } = await supabase.from('attachments').delete().eq('id', id)
-    if (error) throw error
-    return { id }
+  async deleteAttachment(id: Id) {
+    await this.debugAuth();
+    console.log('🗑️ Deleting attachment:', id);
+    
+    // Get attachment info first
+    const { data: attachment, error: fetchError } = await supabase
+      .from('attachments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('❌ Error fetching attachment:', fetchError);
+      throw fetchError;
+    }
+
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('attachments')
+      .remove([attachment.storage_path]);
+
+    if (storageError) {
+      console.error('❌ Error deleting from storage:', storageError);
+    }
+
+    // Delete from database
+    const { error } = await supabase
+      .from('attachments')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Error deleting attachment:', error);
+      throw error;
+    }
+
+    console.log('✅ Attachment deleted');
   }
 
-  // ---------- Optional stubs so Dashboard doesn't break ----------
-  async getCustomers() { return [] }
-  async getLeads() { return [] }
-  async getInvoices() { return [] }
-  async getProducts() { return [] }
+  // ---------- Mock implementations for missing methods ----------
+  async getCustomers() { return []; }
+  async getCustomer(_id: string) { return null; }
+  async createCustomer(customer: Omit<Customer, "id" | "created_at" | "updated_at">) { return customer as Customer; }
+  async updateCustomer(_id: string, updates: Partial<Customer>) { return updates as Customer; }
+  async deleteCustomer(_id: string) { }
+  async getLeads() { return []; }
+  async getLead(_id: string) { return null; }
+  async createLead(lead: Omit<Lead, "id" | "created_at" | "updated_at">) { return lead as Lead; }
+  async updateLead(_id: string, updates: Partial<Lead>) { return updates as Lead; }
+  async deleteLead(_id: string) { }
+  async getCallFollowUp(_id: string) { return null; }
+  async getLeadCalls(_leadId: string) { return []; }
+  async createLeadCall(call: Omit<LeadCall, "id" | "created_at">) { return call as LeadCall; }
+  async getServiceJob(_id: string) { return null; }
+  async getRequirement(_id: string) { return null; }
+  async getQuotes() { return []; }
+  async getQuote(_id: string) { return null; }
+  async createQuote(_quote: any) { return {} as any; }
+  async updateQuote(_id: string, _updates: any) { return {} as any; }
+  async deleteQuote(_id: string) { }
+  async getQuoteItems(_quoteId: string) { return []; }
+  async createQuoteItem(_item: any) { return {} as any; }
+  async updateQuoteItem(_id: string, _updates: any) { return {} as any; }
+  async deleteQuoteItem(_id: string) { }
+  async getProducts() { return []; }
+  async getProduct(_id: string) { return null; }
+  async createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) { return product as Product; }
+  async updateProduct(_id: string, updates: Partial<Product>) { return updates as Product; }
+  async deleteProduct(_id: string) { }
+  async getInstallers() { return []; }
+  async getInstaller(_id: string) { return null; }
+  async createInstaller(_installer: any) { return {} as any; }
+  async updateInstaller(_id: string, _updates: any) { return {} as any; }
+  async deleteInstaller(_id: string) { }
+  async getInvoices() { return []; }
+  async getInvoice(_id: string) { return null; }
+  async createInvoice(_invoice: any) { return {} as any; }
+  async updateInvoice(_id: string, _updates: any) { return {} as any; }
+  async deleteInvoice(_id: string) { }
+  async getPayments() { return []; }
+  async createPayment(_payment: any) { return {} as any; }
 }
